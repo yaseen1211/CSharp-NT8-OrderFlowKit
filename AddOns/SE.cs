@@ -1577,12 +1577,14 @@ namespace NinjaTrader.NinjaScript.AddOns
 							this.pvLadder.Remove(p);
 						}*/
 					}
-//					public MarketOrder AtPrice(double price)
-//					{
-//						if( !this.pvLadder.PriceExists(price) )
-//							return null;
-//						return this.pvLadder[price];
-//					}
+					// !- volumen en un nivel de precio concreto, o NULL si ahi no se opero.
+					// Necesario para el calculo de imbalances (comparacion diagonal entre niveles).
+					public MarketOrder AtPrice(double price)
+					{
+						if( !this.pvLadder.PriceExists(price) )
+							return null;
+						return this.pvLadder[price];
+					}
 					public bool PriceExists(double price)
 					{
 						return this.pvLadder.PriceExists(price);
@@ -1645,6 +1647,42 @@ namespace NinjaTrader.NinjaScript.AddOns
 					// !- Ultimo tiempo de mercado
 					//this[CurrentBar].Time = MarketArgs.Time;
 					
+					return true;
+				}
+				// !- SOBRECARGA: usa el indice de barra REAL de NinjaTrader (CurrentBar) en lugar de
+				// llevar un contador interno basado en el tiempo del tick. Esto mantiene los clusters
+				// perfectamente alineados con las barras del grafico, tanto en Tick Replay(historico)
+				// como en tiempo real, y evita que el indice interno se desincronice cuando faltan
+				// ticks, hay huecos de datos o la barra no avanza por tiempo (Range/Tick/Volume bars).
+				public bool onMarketData(MarketDataEventArgs MarketArgs, int ntBarIndex)
+				{
+					if( MarketArgs.MarketDataType != MarketDataType.Last )
+						return false;
+					if( ntBarIndex < 0 )
+						return false;
+
+					this.isNewBar = false;
+
+					if( ntBarIndex != this.currentBar )
+					{
+						// !- cerramos la barra anterior: calculos de cluster una sola vez
+						if( this.ContainsKey(this.currentBar) )
+						{
+							this[this.currentBar].CalculateMinAndMaxCluster();
+							// !- Solo si activamos el filtro de volumen
+							if( this.minClusterVolumeFilter != -1 )
+								this[this.currentBar].FilterClusterVolume(this.minClusterVolumeFilter, this.volumeType);
+						}
+						this.currentBar = ntBarIndex;
+						this.isNewBar = true;
+					}
+					// !- creamos la barra si aun no existe
+					if( !this.ContainsKey(this.currentBar) )
+						this[this.currentBar] = new Bar();
+
+					// !- Calculos de volumen en cada barra creada
+					this[this.currentBar].CalculateMarketInfo(MarketArgs);
+
 					return true;
 				}
 				// !- Cuando la barra termina de crearse esta retornara True, luego al pasar

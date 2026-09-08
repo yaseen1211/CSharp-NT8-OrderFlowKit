@@ -846,13 +846,18 @@ namespace NinjaTrader.NinjaScript.Indicators.WyckoffZen
 		protected override void OnRender(ChartControl chartControl, ChartScale chartScale)
 		{
 			base.OnRender(chartControl, chartScale);
+			// !- $IsInHitTest es bool: "== null" era siempre false y no filtraba nada.
+			// Quitamos tambien el gate "!IsRealtime": con Tick Replay las barras historicas
+			// ya tienen volumen y el perfil debe dibujarse aunque no haya feed en vivo.
+			if( IsInHitTest || chartControl == null || chartScale == null ||
+				ChartBars == null || ChartBars.Bars == null || RenderTarget == null )
+				return;
 			if( wyckoffBars == null ){
 				wyckoffVP.setChartPanelHW(ChartPanel.H, ChartPanel.W);
 				wyckoffVP.setRenderTarget(chartControl, chartScale, ChartBars, RenderTarget);
 				wyckoffVP.renderMessageInfo(string.Format("Bars number error:{0} minimum required for volume profile:6",  wyckoffVP.getCalculatedBars(_Period)), ChartPanel.W / 3, ChartPanel.H / 2, SharpDX.Color.Beige, 14);
-			}
-			if( !wyckoffVP.IsRealtime || IsInHitTest == null || chartControl == null || ChartBars.Bars == null )
 				return;
+			}
 			// 1- Altura minima de un tick
 			// 2- Ancho de barra en barra
 			wyckoffVP.setHW(chartScale.GetPixelsForDistance(TickSize), chartControl.Properties.BarDistance);
@@ -877,10 +882,12 @@ namespace NinjaTrader.NinjaScript.Indicators.WyckoffZen
 		}
 		protected override void OnMarketData(MarketDataEventArgs MarketArgs)
 		{
-			if( wyckoffBars == null ){
+			if( wyckoffBars == null || CurrentBar < 0 ){
 				return;
 			}
-			if( !wyckoffBars.onMarketData(MarketArgs) ){
+			// !- Indexado por el CurrentBar REAL de NinjaTrader (ver SE.cs), asi el perfil
+			// queda alineado con las barras del grafico en historico y en tiempo real.
+			if( !wyckoffBars.onMarketData(MarketArgs, CurrentBar) ){
 				return;
 			}
 			if( this._EnableMarketProfile ){

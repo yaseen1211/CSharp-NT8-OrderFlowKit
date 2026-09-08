@@ -41,10 +41,7 @@ public static class _OrderFlowEnums
 	public enum Style
 	{
 		Profile,
-		HeatMap,
-		// !- celda de ancho fijo partida en dos mitades (bid | ask), como los footprints
-		// comerciales: fondo teñido segun volumen y el texto "B x A" centrado en la celda.
-		Footprint
+		HeatMap
 	}
 	public enum Position
 	{
@@ -104,64 +101,7 @@ namespace NinjaTrader.NinjaScript.Indicators.WyckoffZen
 			private bool showPOISLines;
 			private bool showText;
 			private bool showOrderFlow;
-			// !- delta total por barra, dibujado debajo del minimo de la vela
-			private bool showBarDelta;
-			private SharpDX.Color colorBarDeltaPositive;
-			private SharpDX.Color colorBarDeltaNegative;
-			private float barDeltaOpacity;
-			private float barDeltaMinBarWidth;
-			private SharpDX.DirectWrite.TextFormat barDeltaTextFormat;
-			// !- tabla resumen Ask/Bid/Delta/Volume al pie del panel
-			private bool showSummary;
-			private float summaryRowHeight;
-			private float summaryMinBarWidth;
-			private float summaryOpacity;
-			private SharpDX.Color colorSummaryAsk;
-			private SharpDX.Color colorSummaryBid;
-			private SharpDX.Color colorSummaryVolume;
-			private SharpDX.Color colorSummaryText;
-			private SharpDX.DirectWrite.TextFormat summaryTextFormat;
-			// !- imbalances (comparacion diagonal ask[P] vs bid[P+tick])
-			private bool showImbalance;
-			private float imbalanceRatio;
-			private long imbalanceMinVolume;
-			private float imbalanceOpacity;
-			private SharpDX.Color colorImbalanceBuy;
-			private SharpDX.Color colorImbalanceSell;
-			// !- imbalances apilados: N niveles consecutivos en la misma direccion
-			private bool showStackedImbalance;
-			private int stackedImbalanceCount;
-			private int stackedImbalanceExtendBars;
-			private float stackedImbalance_strokeWidth;
-			private SharpDX.Direct2D1.StrokeStyle stackedImbalance_strokeStyle;
-			// !- buffers reutilizados por barra: evitan asignaciones en cada OnRender
-			private readonly List<double> imbPrices = new List<double>();
-			private readonly List<int> imbFlags = new List<int>();
-			private readonly Dictionary<double, int> imbByPrice = new Dictionary<double, int>();
-			// !- nivel que se esta dibujando ahora mismo (lo necesita el texto de la celda)
-			private double currentPrice;
-			private int currentImbFlag;
-			// !- estilo Footprint
-			private SharpDX.Color colorImbalanceTextColor;
-			private bool pocFilled;
-			private SharpDX.Color colorPOCFill;
-			private float pocFillOpacity;
-			private long highlightVolumeThreshold;
-			private SharpDX.Color colorHighlightBox;
-			private float highlightBoxWidth;
-			// !- celda footprint: UN color plano por celda (verde/rosa segun el delta del nivel),
-			// no dos mitades. El volumen lo cuentan los numeros, no la saturacion del fondo.
-			private SharpDX.Color colorFootprintUpCell;
-			private SharpDX.Color colorFootprintDownCell;
-			private float footprintCellOpacity;
-			private SharpDX.Color colorFootprintCellBorder;
-			private float footprintCellBorderWidth;
-			private SharpDX.Color colorFootprintText;
-			// !- tres alineaciones para poder pintar "B x A" y colorear solo un lado
-			private SharpDX.DirectWrite.TextFormat fpFormatRight;
-			private SharpDX.DirectWrite.TextFormat fpFormatCenter;
-			private SharpDX.DirectWrite.TextFormat fpFormatLeft;
-
+			
 			// !- setup lines style
 			private float POCLines_strokeWidth;
 			private SharpDX.Direct2D1.StrokeStyle POCLines_strokeStyle;
@@ -246,89 +186,6 @@ namespace NinjaTrader.NinjaScript.Indicators.WyckoffZen
 			{
 				this.minFontWidth = minFontWidth;
 				this.minFontHeight = minFontHeight;
-			}
-			// !- Delta total de la barra, dibujado bajo el minimo de la vela
-			public void setBarDelta(
-				bool showBarDelta, Brush brushPositive, Brush brushNegative,
-				float barDeltaOpacity, float barDeltaMinBarWidth, SimpleFont font)
-			{
-				this.showBarDelta = showBarDelta;
-				this.colorBarDeltaPositive = WyckoffRenderControl.BrushToColor(brushPositive);
-				this.colorBarDeltaNegative = WyckoffRenderControl.BrushToColor(brushNegative);
-				this.barDeltaOpacity = barDeltaOpacity / 100f;
-				this.barDeltaMinBarWidth = barDeltaMinBarWidth;
-				base.setFontStyle(font, out barDeltaTextFormat);
-			}
-			// !- Tabla resumen Ask/Bid/Delta/Volume al pie del panel
-			public void setSummary(
-				bool showSummary, float rowHeight, float minBarWidth, float opacity,
-				Brush brushAsk, Brush brushBid, Brush brushVolume, Brush brushText, SimpleFont font)
-			{
-				this.showSummary = showSummary;
-				this.summaryRowHeight = rowHeight;
-				this.summaryMinBarWidth = minBarWidth;
-				this.summaryOpacity = opacity / 100f;
-				this.colorSummaryAsk = WyckoffRenderControl.BrushToColor(brushAsk);
-				this.colorSummaryBid = WyckoffRenderControl.BrushToColor(brushBid);
-				this.colorSummaryVolume = WyckoffRenderControl.BrushToColor(brushVolume);
-				this.colorSummaryText = WyckoffRenderControl.BrushToColor(brushText);
-				base.setFontStyle(font, out summaryTextFormat);
-			}
-			// !- Opciones del estilo Footprint (celda de ancho fijo)
-			public void setFootprintStyle(
-				Brush brushImbalanceText,
-				bool pocFilled, Brush brushPOCFill, float pocFillOpacity,
-				long highlightVolumeThreshold, Brush brushHighlightBox, float highlightBoxWidth,
-				Brush brushUpCell, Brush brushDownCell, float cellOpacity,
-				Brush brushCellBorder, float cellBorderWidth, Brush brushCellText, SimpleFont cellFont)
-			{
-				this.colorImbalanceTextColor = WyckoffRenderControl.BrushToColor(brushImbalanceText);
-				this.pocFilled = pocFilled;
-				this.colorPOCFill = WyckoffRenderControl.BrushToColor(brushPOCFill);
-				this.pocFillOpacity = pocFillOpacity / 100f;
-				this.highlightVolumeThreshold = highlightVolumeThreshold;
-				this.colorHighlightBox = WyckoffRenderControl.BrushToColor(brushHighlightBox);
-				this.highlightBoxWidth = highlightBoxWidth;
-
-				this.colorFootprintUpCell = WyckoffRenderControl.BrushToColor(brushUpCell);
-				this.colorFootprintDownCell = WyckoffRenderControl.BrushToColor(brushDownCell);
-				this.footprintCellOpacity = cellOpacity / 100f;
-				this.colorFootprintCellBorder = WyckoffRenderControl.BrushToColor(brushCellBorder);
-				this.footprintCellBorderWidth = cellBorderWidth;
-				this.colorFootprintText = WyckoffRenderControl.BrushToColor(brushCellText);
-
-				// !- el mismo font en tres alineaciones: "B" pegado a la derecha, la "x" al
-				// centro y "A" pegado a la izquierda => queda "115 x 39" bien centrado y
-				// permite pintar de azul SOLO el lado con imbalance.
-				base.setFontStyle(cellFont, out fpFormatCenter);
-				base.setFontStyle(cellFont, out fpFormatRight);
-				fpFormatRight.TextAlignment = SharpDX.DirectWrite.TextAlignment.Trailing;
-				base.setFontStyle(cellFont, out fpFormatLeft);
-				fpFormatLeft.TextAlignment = SharpDX.DirectWrite.TextAlignment.Leading;
-			}
-			// !- Imbalances e imbalances apilados
-			public void setImbalance(
-				bool showImbalance, float ratio, long minVolume, float opacity,
-				Brush brushBuy, Brush brushSell,
-				bool showStacked, int stackedCount, int stackedExtendBars,
-				float stackedStrokeWidth, DashStyleHelper stackedStrokeStyle)
-			{
-				this.showImbalance = showImbalance;
-				this.imbalanceRatio = ratio;
-				this.imbalanceMinVolume = minVolume;
-				this.imbalanceOpacity = opacity / 100f;
-				this.colorImbalanceBuy = WyckoffRenderControl.BrushToColor(brushBuy);
-				this.colorImbalanceSell = WyckoffRenderControl.BrushToColor(brushSell);
-
-				this.showStackedImbalance = showStacked;
-				this.stackedImbalanceCount = stackedCount;
-				this.stackedImbalanceExtendBars = stackedExtendBars;
-				this.stackedImbalance_strokeWidth = stackedStrokeWidth;
-
-				SharpDX.Direct2D1.StrokeStyleProperties p = new SharpDX.Direct2D1.StrokeStyleProperties();
-				p.DashStyle = DashStyleHelperToDX(stackedStrokeStyle);
-				this.stackedImbalance_strokeStyle = new SharpDX.Direct2D1.StrokeStyle(
-					NinjaTrader.Core.Globals.D2DFactory, p);
 			}
 			public void setShows(
 				bool showClusterPOC, bool showClusterPOI,
@@ -572,28 +429,8 @@ namespace NinjaTrader.NinjaScript.Indicators.WyckoffZen
 				return 0;
 			}
 			
-			// !- Celda de footprint: un solo color plano (verde si el nivel tiene delta positivo,
-			// rosa si negativo) con opacidad FIJA. En los footprints comerciales el fondo indica
-			// direccion, no cantidad: la cantidad ya la dicen los numeros.
-			private void __renderFootprintCell()
-			{
-				Rect.X = this.barX - (this.W / 2f);
-				Rect.Width = this.W;   // Rect.Y y Rect.Height vienen de renderCluster()
-
-				myFillRectangle(ref Rect,
-					this.volumeInfo.Delta >= 0 ? colorFootprintUpCell : colorFootprintDownCell,
-					this.footprintCellOpacity);
-
-				if( this.footprintCellBorderWidth > 0f )
-					myDrawRectangle(ref Rect, colorFootprintCellBorder, 1.0f, this.footprintCellBorderWidth);
-			}
 			private void __renderBidAsk(float clusterPOC_per, float opacity)
 			{
-				// !- el estilo Footprint pinta la celda entera de un color, no dos mitades
-				if( this.orderFlowStyle == _OrderFlowEnums.Style.Footprint ){
-					__renderFootprintCell();
-					return;
-				}
 				bool invertSign = false;
 				long vol = this.currentBar.MaxClusterVolume.Total;
 				float bidPer = (float)Math2.Percent(vol, this.volumeInfo.Bid) / 100f;
@@ -639,20 +476,8 @@ namespace NinjaTrader.NinjaScript.Indicators.WyckoffZen
 						Rect2.Width= this.W;
 						break;
 					}
-					case _OrderFlowEnums.Style.Footprint:
-					{
-						// !- celda de ancho FIJO: mitad izquierda = bid, mitad derecha = ask.
-						// El ancho no varia con el volumen (eso ya lo dice el color), asi las
-						// columnas quedan alineadas y el texto "B x A" siempre cabe.
-						float half = this.W / 2f;
-						Rect.X  = barX - half;
-						Rect.Width = half;
-						Rect2.X = barX;
-						Rect2.Width= half;
-						break;
-					}
 				}
-
+				
 				myFillRectangle(ref Rect, colorBidClusterColor, bidPer);
 				myFillRectangle(ref Rect2,colorAskClusterColor, askPer);
 			}
@@ -679,7 +504,6 @@ namespace NinjaTrader.NinjaScript.Indicators.WyckoffZen
 						Rect.Width = width_per;
 						break;
 					}
-					case _OrderFlowEnums.Style.Footprint:
 					case _OrderFlowEnums.Style.HeatMap:
 					{
 						Rect.X = barX - (W / 2f);
@@ -713,7 +537,6 @@ namespace NinjaTrader.NinjaScript.Indicators.WyckoffZen
 						Rect.Width = width_per;
 						break;
 					}
-					case _OrderFlowEnums.Style.Footprint:
 					case _OrderFlowEnums.Style.HeatMap:
 					{
 						Rect.X = barX - (W / 2f);
@@ -753,7 +576,6 @@ namespace NinjaTrader.NinjaScript.Indicators.WyckoffZen
 						
 						break;
 					}
-					case _OrderFlowEnums.Style.Footprint:
 					case _OrderFlowEnums.Style.HeatMap:{
 						Rect.X = barX - (W / 2f);
 						Rect.Width = W;
@@ -766,15 +588,7 @@ namespace NinjaTrader.NinjaScript.Indicators.WyckoffZen
 				// de otro modo si el volumen total es identico(se repite en la vela mas de una vez) el renderizado
 				// mostratra mas de un cluster maximo confundiendo cual fue el ultimo maximo...
 				if( this.showClusterPOC && Math2.Percent(currentBar.MaxClusterVolume.Total, volumeInfo.Total) == 100 && currentBar.MaxClusterPrice == price ){
-					// !- relleno (amarillo, estilo footprint comercial) o solo el borde
-					if( this.pocFilled )
-						myFillRectangle(ref Rect, colorPOCFill, pocFillOpacity);
-					else
-						myDrawRectangle(ref Rect, colorMaxVolumeClusterColor, maxClusterOpacity, 1.5f);
-				}
-				// !- caja sobre niveles de volumen significativo (prints grandes)
-				if( this.highlightVolumeThreshold > 0 && volumeInfo.Total >= this.highlightVolumeThreshold ){
-					myDrawRectangle(ref Rect, colorHighlightBox, 1.0f, this.highlightBoxWidth);
+					myDrawRectangle(ref Rect, colorMaxVolumeClusterColor, maxClusterOpacity, 1.5f);
 				}
 				// !- cluster minimo, misma logica
 				if( this.showClusterPOI && Math2.Percent(currentBar.MinClusterVolume.Total, volumeInfo.Total) == 100 && currentBar.MinClusterPrice == price ){
@@ -793,7 +607,6 @@ namespace NinjaTrader.NinjaScript.Indicators.WyckoffZen
 							Rect.X = this.barX + this.calculateXPositionFont();
 							break;
 						}
-						case _OrderFlowEnums.Style.Footprint:
 						case _OrderFlowEnums.Style.HeatMap:
 						{
 							Rect.X = this.barX - (W / 2f);
@@ -804,74 +617,21 @@ namespace NinjaTrader.NinjaScript.Indicators.WyckoffZen
 					Rect.Width = W;
 					Rect.Height = H;
 					
-					// !- el estilo Footprint dibuja los dos numeros por separado (uno por mitad)
-					// para poder colorear solo el lado con imbalance
-					if( this.orderFlowStyle == _OrderFlowEnums.Style.Footprint
-						&& this.orderFlowCalculation == _OrderFlowEnums.Calculation.BidAsk ){
-						this.__renderFootprintCellText();
-					}
-					else{
-						this._renderOFText();
-					}
+					this._renderOFText();//RenderTarget.DrawText(string.Format("{0}x{1}", T, D), volumeTextFormat, Rect, Brushes.CornflowerBlue.ToDxBrush(RenderTarget, 1.0f));
 				}
 			}
 			// !- Renderizado para onRender
-			// !- Texto de celda en estilo Footprint: bid en la mitad izquierda, ask en la derecha,
-			// cada uno con su color. Si el nivel tiene imbalance se resalta SOLO el lado agresor,
-			// que es como lo muestran los footprints comerciales.
-			private void __renderFootprintCellText()
-			{
-				long B = this.volumeInfo.Bid;
-				long A = this.volumeInfo.Ask;
-				string C = "";
-				if( this.orderFlowRepresentation == _OrderFlowEnums.Representation.Percent ){
-					long total = this.volumeInfo.Total;
-					B = (long)Math2.Percent(total, this.volumeInfo.Bid);
-					A = (long)Math2.Percent(total, this.volumeInfo.Ask);
-					C = "%";
-				}
-				// !- "115 x 39": bid pegado a la derecha de su mitad, la "x" al centro y el ask
-				// pegado a la izquierda de la suya. Asi el texto queda centrado en la celda
-				// y cada numero conserva su propio color.
-				float half = this.W / 2f;
-				const float GAP = 5f;   // media anchura de la zona de la "x"
-
-				SharpDX.RectangleF lr = new SharpDX.RectangleF(
-					this.barX - half, Rect.Y, half - GAP, Rect.Height);
-				SharpDX.RectangleF cr = new SharpDX.RectangleF(
-					this.barX - GAP, Rect.Y, GAP * 2f, Rect.Height);
-				SharpDX.RectangleF rr = new SharpDX.RectangleF(
-					this.barX + GAP, Rect.Y, half - GAP, Rect.Height);
-
-				SharpDX.Color bidColor = (this.currentImbFlag < 0) ? colorImbalanceTextColor : colorFootprintText;
-				SharpDX.Color askColor = (this.currentImbFlag > 0) ? colorImbalanceTextColor : colorFootprintText;
-
-				myDrawText(B.ToString() + C, ref lr, bidColor, -1, -1, fpFormatRight, 1.0f);
-				myDrawText("x", ref cr, colorFootprintText, -1, -1, fpFormatCenter, 0.55f);
-				myDrawText(A.ToString() + C, ref rr, askColor, -1, -1, fpFormatLeft, 1.0f);
-			}
 			private void renderBarCluster(double price)
 			{
-				// !- el nivel actual, para que el texto sepa si hay imbalance y de que lado
-				this.currentPrice = price;
-				if( !this.imbByPrice.TryGetValue(price, out this.currentImbFlag) )
-					this.currentImbFlag = 0;
-
 				renderCluster();
 				renderMinMaxCluster(price);
-				renderImbalance(price);
 				renderText();
 			}
 			private void renderLines(int barIndex)
 			{
-				if( !this.showPOCSLines && !this.showPOISLines )
-					return;
 				if( barIndex > 0 ){
 					int prevBarIndex = barIndex - 1;
-					// !- la barra anterior puede no existir (hueco de datos) => no dibujamos la linea
-					VolumeAnalysis.WyckoffBars.Bar prevBar = this.wyckoffBars.At(prevBarIndex);
-					if( prevBar == null || prevBar.MaxClusterVolume.Total == 0 )
-						return;
+					VolumeAnalysis.WyckoffBars.Bar prevBar = this.wyckoffBars[prevBarIndex];
 					float prevBarX = CHART_CONTROL.GetXByBarIndex(CHART_BARS, prevBarIndex);
 					
 					beg_maxClusterVec.X = this.barX;
@@ -931,252 +691,20 @@ namespace NinjaTrader.NinjaScript.Indicators.WyckoffZen
 					}
 				}
 			}
-			// !- Escribe el delta TOTAL de la barra debajo del minimo de la vela.
-			// No pasa por $myDrawText porque ese metodo exige H >= minFontHeight (altura de UN tick)
-			// y aqui el texto es uno por barra, no uno por nivel de precio.
-			private void renderBarDelta(int barIndex)
-			{
-				if( !this.showBarDelta || this.currentBar == null )
-					return;
-				// !- con barras muy estrechas los numeros se solapan: no dibujamos
-				if( this.W < this.barDeltaMinBarWidth || this.barDeltaTextFormat == null )
-					return;
-
-				long D = this.currentBar.Delta;
-				float lowY = CHART_SCALE.GetYByValue(CHART_BARS.Bars.GetLow(barIndex));
-
-				SharpDX.RectangleF r = new SharpDX.RectangleF(
-					this.barX - (this.W / 2f), lowY + 4f, this.W, 16f);
-
-				SharpDX.Direct2D1.Brush dxBrush = new SharpDX.Direct2D1.SolidColorBrush(
-					RENDER_TARGET, D >= 0 ? colorBarDeltaPositive : colorBarDeltaNegative);
-				if( !dxBrush.IsDisposed ){
-					dxBrush.Opacity = this.barDeltaOpacity;
-					RENDER_TARGET.DrawText(D.ToString(), barDeltaTextFormat, r, dxBrush);
-					dxBrush.Dispose();
-				}
-			}
-			// !- redondeo al tick del instrumento: sumar/restar TickSize a un double NO da
-			// exactamente la clave guardada en la escalera (7715.25 + 0.25 => 7715.500000000001),
-			// asi que el precio vecino se normaliza antes de buscarlo.
-			private double neighbourPrice(double price, int ticks)
-			{
-				return CHART_BARS.Bars.Instrument.MasterInstrument.RoundToTickSize(
-					price + (ticks * CHART_BARS.Bars.Instrument.MasterInstrument.TickSize));
-			}
-			// !- Imbalance DIAGONAL, la definicion estandar de footprint:
-			//    compra  => ask[P]  >= ratio * bid[P + 1 tick]
-			//    venta   => bid[P]  >= ratio * ask[P - 1 tick]
-			// Devuelve +1 compra, -1 venta, 0 ninguno.
-			private int calculateImbalance(double price, VolumeAnalysis.MarketOrder vol)
-			{
-				if( !this.showImbalance || this.currentBar == null )
-					return 0;
-
-				// !- compra: agresion al ask contra el bid del nivel de ARRIBA
-				if( vol.Ask >= this.imbalanceMinVolume ){
-					VolumeAnalysis.MarketOrder up = this.currentBar.AtPrice(neighbourPrice(price, 1));
-					long upBid = (up == null) ? 0 : up.Bid;
-					if( (double)vol.Ask >= this.imbalanceRatio * upBid )
-						return 1;
-				}
-				// !- venta: agresion al bid contra el ask del nivel de ABAJO
-				if( vol.Bid >= this.imbalanceMinVolume ){
-					VolumeAnalysis.MarketOrder dn = this.currentBar.AtPrice(neighbourPrice(price, -1));
-					long dnAsk = (dn == null) ? 0 : dn.Ask;
-					if( (double)vol.Bid >= this.imbalanceRatio * dnAsk )
-						return -1;
-				}
-				return 0;
-			}
-			// !- pinta el borde de la celda cuando hay imbalance en ese nivel
-			private void renderImbalance(double price)
-			{
-				if( !this.showImbalance )
-					return;
-				int flag;
-				if( !this.imbByPrice.TryGetValue(price, out flag) || flag == 0 )
-					return;
-
-				Rect.Y = this.barY - (this.H / 2f);
-				Rect.Height = this.H;
-				switch( orderFlowStyle )
-				{
-					case _OrderFlowEnums.Style.Profile:{
-						float bar_x;
-						bool invertSign = this.calculateXPosition(out bar_x);
-						Rect.X = this.barX + bar_x;
-						float w = W / 2f;
-						Rect.Width = invertSign ? -w : w;
-						break;
-					}
-					case _OrderFlowEnums.Style.Footprint:
-					case _OrderFlowEnums.Style.HeatMap:{
-						Rect.X = this.barX - (W / 2f);
-						Rect.Width = W;
-						break;
-					}
-				}
-				myDrawRectangle(ref Rect,
-					flag > 0 ? colorImbalanceBuy : colorImbalanceSell,
-					this.imbalanceOpacity, 2.0f);
-			}
-			// !- Precalculo por barra: marca cada nivel y dibuja las lineas de imbalance APILADO
-			// (N niveles consecutivos - adyacentes en ticks - con imbalance en la misma direccion).
-			private void prepareImbalances(int barIndex)
-			{
-				this.imbByPrice.Clear();
-				this.imbPrices.Clear();
-				this.imbFlags.Clear();
-				if( !this.showImbalance || this.currentBar == null )
-					return;
-
-				// !- la escalera es un SortedDictionary: recorremos de menor a mayor precio
-				foreach(var wb in this.currentBar){
-					int f = calculateImbalance(wb.Key, wb.Value);
-					this.imbByPrice[wb.Key] = f;
-					this.imbPrices.Add(wb.Key);
-					this.imbFlags.Add(f);
-				}
-				if( !this.showStackedImbalance || this.stackedImbalanceCount < 2 )
-					return;
-
-				double tick = CHART_BARS.Bars.Instrument.MasterInstrument.TickSize;
-				double tol = tick / 2.0;
-				int runStart = 0;
-				for(int i = 1; i <= this.imbPrices.Count; i++)
-				{
-					bool sameRun = false;
-					if( i < this.imbPrices.Count ){
-						// !- mismo signo y niveles realmente contiguos (sin huecos de precio)
-						sameRun = this.imbFlags[i] != 0
-							&& this.imbFlags[i] == this.imbFlags[runStart]
-							&& Math.Abs((this.imbPrices[i] - this.imbPrices[i - 1]) - tick) < tol;
-					}
-					if( !sameRun ){
-						int runLen = i - runStart;
-						if( this.imbFlags[runStart] != 0 && runLen >= this.stackedImbalanceCount ){
-							renderStackedLine(barIndex, this.imbPrices[runStart],
-								this.imbPrices[i - 1], this.imbFlags[runStart]);
-						}
-						runStart = i;
-					}
-				}
-			}
-			// !- linea horizontal que proyecta la zona de imbalance apilado hacia la derecha
-			private void renderStackedLine(int barIndex, double priceFrom, double priceTo, int flag)
-			{
-				float x1 = this.barX;
-				float x2 = CHART_CONTROL.GetXByBarIndex(CHART_BARS,
-					Math.Min(barIndex + this.stackedImbalanceExtendBars, CHART_BARS.ToIndex));
-				if( x2 <= x1 )
-					x2 = x1 + (this.W * this.stackedImbalanceExtendBars);
-
-				SharpDX.Color c = flag > 0 ? colorImbalanceBuy : colorImbalanceSell;
-
-				SharpDX.Vector2 a = new SharpDX.Vector2();
-				SharpDX.Vector2 b = new SharpDX.Vector2();
-				a.X = x1; b.X = x2;
-				// !- una linea en cada extremo de la zona apilada
-				a.Y = b.Y = CHART_SCALE.GetYByValue(priceFrom);
-				myDrawLine(ref a, ref b, c, this.imbalanceOpacity,
-					this.stackedImbalance_strokeWidth, this.stackedImbalance_strokeStyle);
-				a.Y = b.Y = CHART_SCALE.GetYByValue(priceTo);
-				myDrawLine(ref a, ref b, c, this.imbalanceOpacity,
-					this.stackedImbalance_strokeWidth, this.stackedImbalance_strokeStyle);
-			}
-			// !- una celda de la tabla resumen: fondo con intensidad proporcional al valor + numero
-			private void renderSummaryCell(SharpDX.RectangleF rect, string text, SharpDX.Color bg, float bgOpacity)
-			{
-				if( bgOpacity < 0f ) bgOpacity = 0f;
-				if( bgOpacity > 1f ) bgOpacity = 1f;
-				myFillRectangle(ref rect, bg, bgOpacity);
-
-				SharpDX.Direct2D1.Brush dxBrush = new SharpDX.Direct2D1.SolidColorBrush(RENDER_TARGET, colorSummaryText);
-				if( !dxBrush.IsDisposed ){
-					RENDER_TARGET.DrawText(text, summaryTextFormat, rect, dxBrush);
-					dxBrush.Dispose();
-				}
-			}
-			// !- Tabla resumen al pie: filas Ask / Bid / Delta / Volume, una columna por barra.
-			// La intensidad del fondo es proporcional al maximo VISIBLE, no a un valor absoluto,
-			// asi la lectura relativa se mantiene util en cualquier instrumento y timeframe.
-			public void renderSummary(int fromIndex, int toIndex, float panelX, float panelY, float panelH)
-			{
-				if( !this.showSummary || this.wyckoffBars == null || this.summaryTextFormat == null )
-					return;
-				if( this.W < this.summaryMinBarWidth )
-					return;
-
-				float rowH = this.summaryRowHeight;
-				float topY = (panelY + panelH) - (rowH * 4f);
-
-				// 1- maximos del rango visible para escalar la intensidad del color
-				long maxAsk = 1, maxBid = 1, maxDelta = 1, maxVol = 1;
-				for(int i = fromIndex; i <= toIndex; i++){
-					VolumeAnalysis.WyckoffBars.Bar b = this.wyckoffBars.At(i);
-					if( b == null ) continue;
-					if( b.Ask > maxAsk ) maxAsk = b.Ask;
-					if( b.Bid > maxBid ) maxBid = b.Bid;
-					long absD = Math.Abs(b.Delta);
-					if( absD > maxDelta ) maxDelta = absD;
-					if( b.Total > maxVol ) maxVol = b.Total;
-				}
-
-				// 2- una columna por barra
-				for(int i = fromIndex; i <= toIndex; i++){
-					VolumeAnalysis.WyckoffBars.Bar b = this.wyckoffBars.At(i);
-					if( b == null ) continue;
-
-					float x = CHART_CONTROL.GetXByBarIndex(CHART_BARS, i) - (this.W / 2f);
-					SharpDX.RectangleF r = new SharpDX.RectangleF(x, topY, this.W, rowH);
-
-					renderSummaryCell(r, b.Ask.ToString(), colorSummaryAsk,
-						((float)b.Ask / maxAsk) * summaryOpacity);
-					r.Y += rowH;
-					renderSummaryCell(r, b.Bid.ToString(), colorSummaryBid,
-						((float)b.Bid / maxBid) * summaryOpacity);
-					r.Y += rowH;
-					long D = b.Delta;
-					renderSummaryCell(r, D.ToString(), D >= 0 ? colorSummaryAsk : colorSummaryBid,
-						((float)Math.Abs(D) / maxDelta) * summaryOpacity);
-					r.Y += rowH;
-					renderSummaryCell(r, b.Total.ToString(), colorSummaryVolume,
-						((float)b.Total / maxVol) * summaryOpacity);
-				}
-
-				// 3- etiquetas de fila, ancladas al borde izquierdo del panel
-				string[] labels = new string[]{ "Ask", "Bid", "Delta", "Volume" };
-				SharpDX.Color[] labelColors = new SharpDX.Color[]{
-					colorSummaryAsk, colorSummaryBid, colorSummaryVolume, colorSummaryVolume };
-				SharpDX.RectangleF lr = new SharpDX.RectangleF(panelX + 1f, topY, 54f, rowH);
-				for(int k = 0; k < labels.Length; k++){
-					renderSummaryCell(lr, labels[k], labelColors[k], 0.85f);
-					lr.Y += rowH;
-				}
-			}
 			public void renderBarClusters(int barIndex, bool realtimeCalculation)
 			{
-				// !- $At() devuelve NULL en lugar de lanzar KeyNotFoundException cuando la barra
-				// no tiene ningun tick registrado (huecos de datos, arranque sin Tick Replay, etc.)
-				this.currentBar = this.wyckoffBars.At(barIndex);
-				if( this.currentBar == null )
-					return;
-				// !- Optimizamos para calculos en tiempo-real. El POC/POI tambien se recalcula si la
-				// barra nunca fue cerrada (MaxClusterVolume == 0), de otro modo $Math2.Percent divide
-				// entre cero y la opacidad de los clusters sale Infinity => nada visible.
-				if( realtimeCalculation || this.currentBar.MaxClusterVolume.Total == 0 ){
+				// !- Optimizamos para calculos en tiempo-real
+				if( realtimeCalculation ){
+					//if( !this.wyckoffBars.BarExists(barIndex) ) return;
+					this.currentBar = this.wyckoffBars.CurrentBar;//this.currentBar = this.wyckoffBars[barIndex];
 					this.currentBar.CalculateMinAndMaxCluster();
 				}
-				if( this.currentBar.MaxClusterVolume.Total == 0 )
-					return;
+				else{
+					this.currentBar = this.wyckoffBars[barIndex];
+				}
 				this.barX = CHART_CONTROL.GetXByBarIndex(CHART_BARS, barIndex);
 				// -- renderizamos las lineas de POCs y POIs si estas fueron calculadas
 				renderLines(barIndex);
-				// -- delta total de la barra, debajo del minimo
-				renderBarDelta(barIndex);
-				// -- marcamos los niveles con imbalance y dibujamos los apilados
-				prepareImbalances(barIndex);
 				
 				double price;
 				foreach(var wb in currentBar){
@@ -1195,9 +723,7 @@ namespace NinjaTrader.NinjaScript.Indicators.WyckoffZen
 		
 		private VolumeAnalysis.WyckoffBars wyckoffBars;
 		private WyckoffOrderFlow wyckoffOF;
-		// !- true cuando la serie de datos tiene "Tick Replay" activado
-		private bool isTickReplay;
-
+		
 		#endregion
 		
 		protected override void OnStateChange()
@@ -1219,22 +745,15 @@ namespace NinjaTrader.NinjaScript.Indicators.WyckoffZen
 				//Disable this property if your indicator requires custom values that cumulate with each new market data event. 
 				//See Help Guide for additional information.
 				IsSuspendedWhileInactive					= false;
-				// !- necesitamos dibujar desde la primera barra cargada
-				BarsRequiredToPlot							= 0;
-				isTickReplay								= false;
-
+				
 				// !- Setup de estilo
 				_TextFont = new SimpleFont();
 				_TextFont.Family = new FontFamily("Arial");
 				_TextFont.Size = 10f;
 				_TextFont.Bold = false;
 				_TextFont.Italic= false;
-
-				// !- $_MinFontHeight es la ALTURA EN PIXELES DE UN TICK necesaria para dibujar los
-				// numeros. Con el valor antiguo(10) un grafico de 5 min en 6E (1 tick ~ 2-3 px)
-				// nunca llegaba al umbral y el footprint salia sin numeros. 1 = dibujar siempre;
-				// subelo si quieres que los numeros se oculten al alejar el zoom.
-				_MinFontWidth = 1f; _MinFontHeight= 1f;
+				
+				_MinFontWidth = 10f; _MinFontHeight= 10f;
 				_BidTextVolumeColor = Brushes.LightCoral;
 				_BidTextOpacity = 100f;
 				_AskTextVolumeColor = Brushes.DarkSeaGreen;
@@ -1266,10 +785,6 @@ namespace NinjaTrader.NinjaScript.Indicators.WyckoffZen
 				_OrderFlowCalculation = _OrderFlowEnums.Calculation.BidAsk;
 				_OrderFlowRepresentation = _OrderFlowEnums.Representation.Volume;
 				_OrderFlowPosition = _OrderFlowEnums.Position.Right;
-				// !- El original no asignaba $_OrderFlowStyle, asi que caia en el valor 0 del
-				// enum (Profile). Por defecto usamos Footprint: celdas de ancho fijo "B x A",
-				// que es el aspecto de footprint que se espera hoy en dia.
-				_OrderFlowStyle = _OrderFlowEnums.Style.Footprint;
 				
 				_ShowClusterPOC = true;
 				_ShowPOCSLines = false;
@@ -1277,69 +792,6 @@ namespace NinjaTrader.NinjaScript.Indicators.WyckoffZen
 				_ShowPOISLines = false;
 				_ShowText = true;
 				_ShowOrderFlow = true;
-
-				// !- Delta total por barra (el numero bajo cada vela)
-				_ShowBarDelta = true;
-				_BarDeltaPositiveColor = Brushes.SeaGreen;
-				_BarDeltaNegativeColor = Brushes.Firebrick;
-				_BarDeltaOpacity = 100f;
-				_BarDeltaMinBarWidth = 14f;
-				_BarDeltaFont = new SimpleFont();
-				_BarDeltaFont.Family = new FontFamily("Arial");
-				_BarDeltaFont.Size = 11f;
-				_BarDeltaFont.Bold = true;
-				_BarDeltaFont.Italic = false;
-
-				// !- Tabla resumen al pie (Ask / Bid / Delta / Volume)
-				_ShowSummary = true;
-				_SummaryRowHeight = 13f;
-				_SummaryMinBarWidth = 14f;
-				_SummaryOpacity = 85f;
-				_SummaryAskColor = Brushes.SeaGreen;
-				_SummaryBidColor = Brushes.Firebrick;
-				_SummaryVolumeColor = Brushes.SteelBlue;
-				_SummaryTextColor = Brushes.WhiteSmoke;
-				_SummaryFont = new SimpleFont();
-				_SummaryFont.Family = new FontFamily("Arial");
-				_SummaryFont.Size = 10f;
-				_SummaryFont.Bold = false;
-				_SummaryFont.Italic = false;
-
-				// !- Imbalances (diagonal) e imbalances apilados
-				_ShowImbalance = true;
-				_ImbalanceRatio = 3.0f;
-				_ImbalanceMinVolume = 10;
-				_ImbalanceOpacity = 90f;
-				_ImbalanceBuyColor = Brushes.Lime;
-				_ImbalanceSellColor = Brushes.OrangeRed;
-				_ShowStackedImbalance = true;
-				_StackedImbalanceCount = 3;
-				_StackedImbalanceExtendBars = 12;
-				_StackedImbalance_strokeWidth = 1.5f;
-				_StackedImbalanceStrokeStyle = DashStyleHelper.Dot;
-
-				// !- Estilo Footprint (celda de ancho fijo). Los valores por defecto estan
-				// pensados para un grafico de FONDO BLANCO, como los footprints comerciales.
-				_ImbalanceTextColor = Brushes.Blue;
-				_ClusterPOCFilled = true;
-				_POCFillColor = Brushes.Gold;
-				_POCFillOpacity = 90f;
-				_HighlightVolumeThreshold = 0;      // 0 = desactivado
-				_HighlightBoxColor = Brushes.Black;
-				_HighlightBoxWidth = 1.5f;
-
-				// !- celda footprint, valores pensados para FONDO BLANCO
-				_FootprintUpCellColor = Brushes.LightGreen;
-				_FootprintDownCellColor = Brushes.LightPink;
-				_FootprintCellOpacity = 55f;
-				_FootprintCellBorderColor = Brushes.Gainsboro;
-				_FootprintCellBorderWidth = 0f;     // 0 = sin borde
-				_FootprintTextColor = Brushes.Black;
-				_FootprintFont = new SimpleFont();
-				_FootprintFont.Family = new FontFamily("Arial");
-				_FootprintFont.Size = 10f;
-				_FootprintFont.Bold = false;
-				_FootprintFont.Italic = false;
 				// !- calculamos la ultima barra creada en tiempo real/mercado (?)
 				_RealtimeHeuristic = true;
 			}
@@ -1364,77 +816,6 @@ namespace NinjaTrader.NinjaScript.Indicators.WyckoffZen
 				wyckoffOF.setShows(_ShowClusterPOC, _ShowClusterPOI,
 				_ShowPOCSLines, _ShowPOISLines,
 				_ShowText, _ShowOrderFlow);
-				// !- un chart template guardado ANTES de existir estas propiedades las deserializa
-				// como null/0; rellenamos para no romper $setFontStyle ni $BrushToColor.
-				if( _BarDeltaPositiveColor == null ) _BarDeltaPositiveColor = Brushes.SeaGreen;
-				if( _BarDeltaNegativeColor == null ) _BarDeltaNegativeColor = Brushes.Firebrick;
-				if( _BarDeltaOpacity <= 0f ) _BarDeltaOpacity = 100f;
-				if( _BarDeltaMinBarWidth <= 0f ) _BarDeltaMinBarWidth = 14f;
-				if( _BarDeltaFont == null ){
-					_BarDeltaFont = new SimpleFont();
-					_BarDeltaFont.Family = new FontFamily("Arial");
-					_BarDeltaFont.Size = 11f;
-					_BarDeltaFont.Bold = true;
-					_BarDeltaFont.Italic = false;
-				}
-				wyckoffOF.setBarDelta(_ShowBarDelta, _BarDeltaPositiveColor, _BarDeltaNegativeColor,
-					_BarDeltaOpacity, _BarDeltaMinBarWidth, _BarDeltaFont);
-
-				// !- mismos guardas para la tabla resumen (templates guardados antes de existir)
-				if( _SummaryAskColor == null )    _SummaryAskColor = Brushes.SeaGreen;
-				if( _SummaryBidColor == null )    _SummaryBidColor = Brushes.Firebrick;
-				if( _SummaryVolumeColor == null ) _SummaryVolumeColor = Brushes.SteelBlue;
-				if( _SummaryTextColor == null )   _SummaryTextColor = Brushes.WhiteSmoke;
-				if( _SummaryRowHeight <= 0f )     _SummaryRowHeight = 13f;
-				if( _SummaryMinBarWidth <= 0f )   _SummaryMinBarWidth = 14f;
-				if( _SummaryOpacity <= 0f )       _SummaryOpacity = 85f;
-				if( _SummaryFont == null ){
-					_SummaryFont = new SimpleFont();
-					_SummaryFont.Family = new FontFamily("Arial");
-					_SummaryFont.Size = 10f;
-					_SummaryFont.Bold = false;
-					_SummaryFont.Italic = false;
-				}
-				wyckoffOF.setSummary(_ShowSummary, _SummaryRowHeight, _SummaryMinBarWidth, _SummaryOpacity,
-					_SummaryAskColor, _SummaryBidColor, _SummaryVolumeColor, _SummaryTextColor, _SummaryFont);
-
-				// !- guardas para imbalances
-				if( _ImbalanceBuyColor == null )  _ImbalanceBuyColor = Brushes.Lime;
-				if( _ImbalanceSellColor == null ) _ImbalanceSellColor = Brushes.OrangeRed;
-				if( _ImbalanceRatio < 1f )        _ImbalanceRatio = 3.0f;
-				if( _ImbalanceOpacity <= 0f )     _ImbalanceOpacity = 90f;
-				if( _StackedImbalanceCount < 2 )  _StackedImbalanceCount = 3;
-				if( _StackedImbalanceExtendBars < 1 ) _StackedImbalanceExtendBars = 12;
-				if( _StackedImbalance_strokeWidth <= 0f ) _StackedImbalance_strokeWidth = 1.5f;
-				// !- guardas + wiring del estilo Footprint
-				if( _ImbalanceTextColor == null ) _ImbalanceTextColor = Brushes.Blue;
-				if( _POCFillColor == null )       _POCFillColor = Brushes.Gold;
-				if( _HighlightBoxColor == null )  _HighlightBoxColor = Brushes.Black;
-				if( _POCFillOpacity <= 0f )       _POCFillOpacity = 90f;
-				if( _HighlightBoxWidth <= 0f )    _HighlightBoxWidth = 1.5f;
-				if( _FootprintUpCellColor == null )     _FootprintUpCellColor = Brushes.LightGreen;
-				if( _FootprintDownCellColor == null )   _FootprintDownCellColor = Brushes.LightPink;
-				if( _FootprintCellBorderColor == null ) _FootprintCellBorderColor = Brushes.Gainsboro;
-				if( _FootprintTextColor == null )       _FootprintTextColor = Brushes.Black;
-				if( _FootprintCellOpacity <= 0f )       _FootprintCellOpacity = 55f;
-				if( _FootprintFont == null ){
-					_FootprintFont = new SimpleFont();
-					_FootprintFont.Family = new FontFamily("Arial");
-					_FootprintFont.Size = 10f;
-					_FootprintFont.Bold = false;
-					_FootprintFont.Italic = false;
-				}
-				wyckoffOF.setFootprintStyle(_ImbalanceTextColor,
-					_ClusterPOCFilled, _POCFillColor, _POCFillOpacity,
-					_HighlightVolumeThreshold, _HighlightBoxColor, _HighlightBoxWidth,
-					_FootprintUpCellColor, _FootprintDownCellColor, _FootprintCellOpacity,
-					_FootprintCellBorderColor, _FootprintCellBorderWidth,
-					_FootprintTextColor, _FootprintFont);
-
-				wyckoffOF.setImbalance(_ShowImbalance, _ImbalanceRatio, _ImbalanceMinVolume, _ImbalanceOpacity,
-					_ImbalanceBuyColor, _ImbalanceSellColor,
-					_ShowStackedImbalance, _StackedImbalanceCount, _StackedImbalanceExtendBars,
-					_StackedImbalance_strokeWidth, _StackedImbalanceStrokeStyle);
 				
 				Calculate= Calculate.OnEachTick;
 			}
@@ -1442,11 +823,6 @@ namespace NinjaTrader.NinjaScript.Indicators.WyckoffZen
 			{
 				wyckoffBars = new VolumeAnalysis.WyckoffBars(Bars);
 				wyckoffOF.setWyckoffBars(wyckoffBars);
-				// !- Sin Tick Replay NO existen eventos $OnMarketData para las barras historicas,
-				// por lo tanto el order flow quedaria completamente vacio. Lo detectamos aqui para
-				// poder avisar en pantalla en lugar de dibujar un grafico en blanco sin explicacion.
-				// !- $IsTickReplays es un bool?[] (nullable), por eso comparamos con "== true"
-				isTickReplay = IsTickReplays != null && IsTickReplays.Length > 0 && IsTickReplays[0] == true;
 			}
 			else if(State == State.Realtime)
 			{
@@ -1458,93 +834,52 @@ namespace NinjaTrader.NinjaScript.Indicators.WyckoffZen
 					ChartControl.Properties.BarMarginRight = 0;
 			}
 		}
-		// !- Aviso en pantalla cuando el Tick Replay esta desactivado
-		private void renderTickReplayWarning(ChartControl chartControl)
-		{
-			string msg = "Order Flow: Tick Replay is OFF - no historical order flow data."
-				+ Environment.NewLine
-				+ "Right-click chart > Data Series > set 'Tick Replay' = True"
-				+ Environment.NewLine
-				+ "(needs Tools > Options > Market Data > 'Show Tick Replay' and downloaded tick data)";
-
-			using(SharpDX.DirectWrite.TextFormat tf = new SharpDX.DirectWrite.TextFormat(
-					NinjaTrader.Core.Globals.DirectWriteFactory, "Arial", 13f))
-			using(SharpDX.Direct2D1.SolidColorBrush brush =
-					new SharpDX.Direct2D1.SolidColorBrush(RenderTarget, SharpDX.Color.Orange))
-			{
-				SharpDX.RectangleF r = new SharpDX.RectangleF(
-					ChartPanel.X + 12, ChartPanel.Y + 12, ChartPanel.W - 24, 70);
-				RenderTarget.DrawText(msg, tf, r, brush);
-			}
-		}
 		protected override void OnRender(ChartControl chartControl, ChartScale chartScale)
 		{
 			base.OnRender(chartControl, chartScale);
-			// !- $IsInHitTest es un bool: la comparacion original "== null" era siempre false y
-			// nunca filtraba nada. Ademas quitamos el gate "!IsRealtime": con Tick Replay las
-			// barras historicas ya tienen clusters y deben dibujarse aunque no haya feed en vivo.
-			if( IsInHitTest || chartControl == null || chartScale == null ||
-				ChartBars == null || ChartBars.Bars == null ||
-				wyckoffBars == null || RenderTarget == null ){
+			if( !wyckoffOF.IsRealtime || IsInHitTest == null ||
+				chartControl == null || ChartBars.Bars == null ){
 				return;
 			}
-			if( !isTickReplay ){
-				renderTickReplayWarning(chartControl);
-			}
-
+			
 			#region RENDER_ORDER_FLOW
-
+			
 			float W = chartControl.Properties.BarDistance;
-
-			// !- Escribir en $BarMarginRight en cada render dispara un PropertyChanged y provoca
-			// un bucle de repintado; solo lo tocamos cuando el valor realmente cambia.
-			int wantedMargin = ChartControl.Properties.BarMarginRight;
+			
 			if( this._OrderFlowStyle == _OrderFlowEnums.Style.HeatMap ){
-				wantedMargin = (int)(W / 4);
+				ChartControl.Properties.BarMarginRight = (int)(W / 4);
 			}
 			if( this._OrderFlowPosition == _OrderFlowEnums.Position.Right ){
-				wantedMargin = (int)(W / 1.5);
+				ChartControl.Properties.BarMarginRight = (int)(W / 1.5);
 			}
-			if( ChartControl.Properties.BarMarginRight != wantedMargin ){
-				ChartControl.Properties.BarMarginRight = wantedMargin;
-			}
-
+			
 			//renderOF.BarW = (float)chartControl.BarWidth;
 			// 1- Altura minima de un tick
 			// 2- Ancho de barra en barra
 			wyckoffOF.setHW(chartScale.GetPixelsForDistance(TickSize), W);
 			// !- Apuntamos al target de renderizado
 			wyckoffOF.setRenderTarget(chartControl, chartScale, ChartBars, RenderTarget);
-
+			
 			int fromIndex = ChartBars.FromIndex;
 			int toIndex = ChartBars.ToIndex;
-			// !- rango visible completo (incluida la barra en construccion) para la tabla resumen
-			int summaryToIndex = Math.Min(toIndex, wyckoffBars.CurrentBarIndex);
-			// ?- es la ultima barra generada (en construccion): se recalcula en cada render
-			if( toIndex >= wyckoffBars.CurrentBarIndex )
+			// ?- es la ultima barra generada
+			if( toIndex == wyckoffBars.CurrentBarIndex )
 			{
-				toIndex = wyckoffBars.CurrentBarIndex;
 				if( _RealtimeHeuristic ){
 					wyckoffOF.renderBarClusters(toIndex, true);
 				}
 				// -- no cargamos la ultima barra en creacion
 				toIndex--;
 			}
-
+			
 			for(int barIndex = fromIndex; barIndex <= toIndex; barIndex++){
 				wyckoffOF.renderBarClusters(barIndex, false);
 			}
-			// !- tabla resumen Ask/Bid/Delta/Volume al pie del panel
-			wyckoffOF.renderSummary(fromIndex, summaryToIndex, ChartPanel.X, ChartPanel.Y, ChartPanel.H);
-
+			
 			#endregion
 		}
 		protected override void OnMarketData(MarketDataEventArgs MarketArgs){
-			if( wyckoffBars == null || CurrentBar < 0 )
-				return;
-			// !- Indexamos por el CurrentBar REAL de NinjaTrader para que los clusters queden
-			// alineados con las barras del grafico en historico(Tick Replay) y en tiempo real.
-			wyckoffBars.onMarketData(MarketArgs, CurrentBar);
+			wyckoffBars.onMarketData(MarketArgs);
 		}
 		
 		#region Properties
@@ -1786,296 +1121,7 @@ namespace NinjaTrader.NinjaScript.Indicators.WyckoffZen
 		[Display(Name="Order flow", Order=5, GroupName="Order flow show")]
 		public bool _ShowOrderFlow
 		{ get; set; }
-
-		// !- Delta total por barra. Sin [NinjaScriptProperty] a proposito: asi NO entra en la
-		// firma del constructor autogenerado y no rompe nada que ya referencie el indicador.
-		// Igualmente aparece en el dialogo de propiedades y se serializa en el chart template.
-		[Display(Name="Bar delta (number under bar)", Order=6, GroupName="Order flow show")]
-		public bool _ShowBarDelta
-		{ get; set; }
-
-		[XmlIgnore]
-		[Display(Name="Bar delta positive", Order=10, GroupName="Order flow style")]
-		public Brush _BarDeltaPositiveColor
-		{ get; set; }
-		[Browsable(false)]
-		public string _BarDeltaPositiveColorSerializable
-		{
-			get { return Serialize.BrushToString(_BarDeltaPositiveColor); }
-			set { _BarDeltaPositiveColor = Serialize.StringToBrush(value); }
-		}
-
-		[XmlIgnore]
-		[Display(Name="Bar delta negative", Order=11, GroupName="Order flow style")]
-		public Brush _BarDeltaNegativeColor
-		{ get; set; }
-		[Browsable(false)]
-		public string _BarDeltaNegativeColorSerializable
-		{
-			get { return Serialize.BrushToString(_BarDeltaNegativeColor); }
-			set { _BarDeltaNegativeColor = Serialize.StringToBrush(value); }
-		}
-
-		[Range(1, 100)]
-		[Display(Name="Bar delta opacity", Order=12, GroupName="Order flow style")]
-		public float _BarDeltaOpacity
-		{ get; set; }
-
-		// !- ancho minimo de barra (px) para dibujar el delta; evita solapamiento al alejar zoom
-		[Range(1, 200)]
-		[Display(Name="Bar delta min bar width", Order=13, GroupName="Order flow style")]
-		public float _BarDeltaMinBarWidth
-		{ get; set; }
-
-		[Display(Name="Bar delta font", Order=14, GroupName="Order flow style")]
-		public SimpleFont _BarDeltaFont
-		{ get; set; }
-
-		// !- Tabla resumen Ask/Bid/Delta/Volume al pie del panel
-		[Display(Name="Summary rows (Ask/Bid/Delta/Volume)", Order=7, GroupName="Order flow show")]
-		public bool _ShowSummary
-		{ get; set; }
-
-		[Range(6, 40)]
-		[Display(Name="Summary row height", Order=20, GroupName="Order flow summary")]
-		public float _SummaryRowHeight
-		{ get; set; }
-
-		[Range(1, 200)]
-		[Display(Name="Summary min bar width", Order=21, GroupName="Order flow summary")]
-		public float _SummaryMinBarWidth
-		{ get; set; }
-
-		[Range(1, 100)]
-		[Display(Name="Summary opacity", Order=22, GroupName="Order flow summary")]
-		public float _SummaryOpacity
-		{ get; set; }
-
-		[XmlIgnore]
-		[Display(Name="Summary ask", Order=23, GroupName="Order flow summary")]
-		public Brush _SummaryAskColor
-		{ get; set; }
-		[Browsable(false)]
-		public string _SummaryAskColorSerializable
-		{
-			get { return Serialize.BrushToString(_SummaryAskColor); }
-			set { _SummaryAskColor = Serialize.StringToBrush(value); }
-		}
-
-		[XmlIgnore]
-		[Display(Name="Summary bid", Order=24, GroupName="Order flow summary")]
-		public Brush _SummaryBidColor
-		{ get; set; }
-		[Browsable(false)]
-		public string _SummaryBidColorSerializable
-		{
-			get { return Serialize.BrushToString(_SummaryBidColor); }
-			set { _SummaryBidColor = Serialize.StringToBrush(value); }
-		}
-
-		[XmlIgnore]
-		[Display(Name="Summary volume", Order=25, GroupName="Order flow summary")]
-		public Brush _SummaryVolumeColor
-		{ get; set; }
-		[Browsable(false)]
-		public string _SummaryVolumeColorSerializable
-		{
-			get { return Serialize.BrushToString(_SummaryVolumeColor); }
-			set { _SummaryVolumeColor = Serialize.StringToBrush(value); }
-		}
-
-		[XmlIgnore]
-		[Display(Name="Summary text", Order=26, GroupName="Order flow summary")]
-		public Brush _SummaryTextColor
-		{ get; set; }
-		[Browsable(false)]
-		public string _SummaryTextColorSerializable
-		{
-			get { return Serialize.BrushToString(_SummaryTextColor); }
-			set { _SummaryTextColor = Serialize.StringToBrush(value); }
-		}
-
-		[Display(Name="Summary font", Order=27, GroupName="Order flow summary")]
-		public SimpleFont _SummaryFont
-		{ get; set; }
-
-		// !- Imbalances
-		[Display(Name="Imbalances", Order=8, GroupName="Order flow show")]
-		public bool _ShowImbalance
-		{ get; set; }
-
-		[Range(1.1, 20.0)]
-		[Display(Name="Imbalance ratio (x:1)", Order=30, GroupName="Order flow imbalance")]
-		public float _ImbalanceRatio
-		{ get; set; }
-
-		[Range(0, 100000)]
-		[Display(Name="Imbalance min volume", Order=31, GroupName="Order flow imbalance")]
-		public long _ImbalanceMinVolume
-		{ get; set; }
-
-		[Range(1, 100)]
-		[Display(Name="Imbalance opacity", Order=32, GroupName="Order flow imbalance")]
-		public float _ImbalanceOpacity
-		{ get; set; }
-
-		[XmlIgnore]
-		[Display(Name="Imbalance buy", Order=33, GroupName="Order flow imbalance")]
-		public Brush _ImbalanceBuyColor
-		{ get; set; }
-		[Browsable(false)]
-		public string _ImbalanceBuyColorSerializable
-		{
-			get { return Serialize.BrushToString(_ImbalanceBuyColor); }
-			set { _ImbalanceBuyColor = Serialize.StringToBrush(value); }
-		}
-
-		[XmlIgnore]
-		[Display(Name="Imbalance sell", Order=34, GroupName="Order flow imbalance")]
-		public Brush _ImbalanceSellColor
-		{ get; set; }
-		[Browsable(false)]
-		public string _ImbalanceSellColorSerializable
-		{
-			get { return Serialize.BrushToString(_ImbalanceSellColor); }
-			set { _ImbalanceSellColor = Serialize.StringToBrush(value); }
-		}
-
-		[Display(Name="Stacked imbalance lines", Order=35, GroupName="Order flow imbalance")]
-		public bool _ShowStackedImbalance
-		{ get; set; }
-
-		[Range(2, 20)]
-		[Display(Name="Stacked count (levels)", Order=36, GroupName="Order flow imbalance")]
-		public int _StackedImbalanceCount
-		{ get; set; }
-
-		[Range(1, 500)]
-		[Display(Name="Stacked extend (bars)", Order=37, GroupName="Order flow imbalance")]
-		public int _StackedImbalanceExtendBars
-		{ get; set; }
-
-		[Range(0.5, 10.0)]
-		[Display(Name="Stacked line width", Order=38, GroupName="Order flow imbalance")]
-		public float _StackedImbalance_strokeWidth
-		{ get; set; }
-
-		[Display(Name="Stacked line style", Order=39, GroupName="Order flow imbalance")]
-		public DashStyleHelper _StackedImbalanceStrokeStyle
-		{ get; set; }
-
-		// !- Estilo Footprint (celda de ancho fijo)
-		[XmlIgnore]
-		[Display(Name="Imbalance text color", Order=40, GroupName="Order flow footprint")]
-		public Brush _ImbalanceTextColor
-		{ get; set; }
-		[Browsable(false)]
-		public string _ImbalanceTextColorSerializable
-		{
-			get { return Serialize.BrushToString(_ImbalanceTextColor); }
-			set { _ImbalanceTextColor = Serialize.StringToBrush(value); }
-		}
-
-		[Display(Name="POC filled (not outline)", Order=41, GroupName="Order flow footprint")]
-		public bool _ClusterPOCFilled
-		{ get; set; }
-
-		[XmlIgnore]
-		[Display(Name="POC fill color", Order=42, GroupName="Order flow footprint")]
-		public Brush _POCFillColor
-		{ get; set; }
-		[Browsable(false)]
-		public string _POCFillColorSerializable
-		{
-			get { return Serialize.BrushToString(_POCFillColor); }
-			set { _POCFillColor = Serialize.StringToBrush(value); }
-		}
-
-		[Range(1, 100)]
-		[Display(Name="POC fill opacity", Order=43, GroupName="Order flow footprint")]
-		public float _POCFillOpacity
-		{ get; set; }
-
-		// !- 0 = desactivado. Dibuja una caja sobre cada nivel con volumen >= este valor.
-		[Range(0, 1000000)]
-		[Display(Name="Highlight volume >= (0 = off)", Order=44, GroupName="Order flow footprint")]
-		public long _HighlightVolumeThreshold
-		{ get; set; }
-
-		[XmlIgnore]
-		[Display(Name="Highlight box color", Order=45, GroupName="Order flow footprint")]
-		public Brush _HighlightBoxColor
-		{ get; set; }
-		[Browsable(false)]
-		public string _HighlightBoxColorSerializable
-		{
-			get { return Serialize.BrushToString(_HighlightBoxColor); }
-			set { _HighlightBoxColor = Serialize.StringToBrush(value); }
-		}
-
-		[Range(0.5, 6.0)]
-		[Display(Name="Highlight box width", Order=46, GroupName="Order flow footprint")]
-		public float _HighlightBoxWidth
-		{ get; set; }
-
-		[XmlIgnore]
-		[Display(Name="Cell up color (delta +)", Order=47, GroupName="Order flow footprint")]
-		public Brush _FootprintUpCellColor
-		{ get; set; }
-		[Browsable(false)]
-		public string _FootprintUpCellColorSerializable
-		{
-			get { return Serialize.BrushToString(_FootprintUpCellColor); }
-			set { _FootprintUpCellColor = Serialize.StringToBrush(value); }
-		}
-
-		[XmlIgnore]
-		[Display(Name="Cell down color (delta -)", Order=48, GroupName="Order flow footprint")]
-		public Brush _FootprintDownCellColor
-		{ get; set; }
-		[Browsable(false)]
-		public string _FootprintDownCellColorSerializable
-		{
-			get { return Serialize.BrushToString(_FootprintDownCellColor); }
-			set { _FootprintDownCellColor = Serialize.StringToBrush(value); }
-		}
-
-		[Range(1, 100)]
-		[Display(Name="Cell opacity", Order=49, GroupName="Order flow footprint")]
-		public float _FootprintCellOpacity
-		{ get; set; }
-
-		[XmlIgnore]
-		[Display(Name="Cell border color", Order=50, GroupName="Order flow footprint")]
-		public Brush _FootprintCellBorderColor
-		{ get; set; }
-		[Browsable(false)]
-		public string _FootprintCellBorderColorSerializable
-		{
-			get { return Serialize.BrushToString(_FootprintCellBorderColor); }
-			set { _FootprintCellBorderColor = Serialize.StringToBrush(value); }
-		}
-
-		[Range(0.0, 4.0)]
-		[Display(Name="Cell border width (0 = off)", Order=51, GroupName="Order flow footprint")]
-		public float _FootprintCellBorderWidth
-		{ get; set; }
-
-		[XmlIgnore]
-		[Display(Name="Cell text color", Order=52, GroupName="Order flow footprint")]
-		public Brush _FootprintTextColor
-		{ get; set; }
-		[Browsable(false)]
-		public string _FootprintTextColorSerializable
-		{
-			get { return Serialize.BrushToString(_FootprintTextColor); }
-			set { _FootprintTextColor = Serialize.StringToBrush(value); }
-		}
-
-		[Display(Name="Cell font", Order=53, GroupName="Order flow footprint")]
-		public SimpleFont _FootprintFont
-		{ get; set; }
-
+		
 		#endregion
 	}
 }
